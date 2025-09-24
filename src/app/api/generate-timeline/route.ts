@@ -7,8 +7,9 @@ const anthropic = new Anthropic({
 });
 
 export async function POST(req: NextRequest) {
+  const { keyword } = await req.json(); // 移到外层以便兜底方案使用
+
   try {
-    const { keyword } = await req.json();
 
     if (!keyword) {
       return NextResponse.json({ error: 'Keyword is required' }, { status: 400 });
@@ -71,22 +72,33 @@ export async function POST(req: NextRequest) {
       console.error('JSON parse error:', parseError);
       console.error('Raw JSON:', jsonMatch[0]);
 
-      // 容错处理：如果JSON不完整，尝试修复
+      // 容错处理：修复不完整的JSON
       let jsonText = jsonMatch[0];
-      if (!jsonText.endsWith(']')) {
-        // 尝试找到最后一个完整的对象
+
+      // 如果 JSON 不是以 ] 结尾，说明被截断了
+      if (!jsonText.trim().endsWith(']')) {
+        // 查找最后一个完整的对象结束位置
         const lastCompleteObject = jsonText.lastIndexOf('}');
+
         if (lastCompleteObject > -1) {
-          jsonText = jsonText.substring(0, lastCompleteObject + 1) + ']';
+          // 截取到最后一个完整对象，并添加数组结束符
+          jsonText = jsonText.substring(0, lastCompleteObject + 1) + '\n]';
+          console.log('Attempting to fix truncated JSON:', jsonText.slice(-100));
+
           try {
             events = JSON.parse(jsonText);
+            console.log('Successfully parsed fixed JSON, got', events.length, 'events');
           } catch (retryError) {
+            console.error('Failed to parse fixed JSON:', retryError);
             throw new Error('Failed to parse incomplete JSON response');
           }
         } else {
+          console.error('JSON too incomplete - no complete objects found');
           throw new Error('JSON response is too incomplete to parse');
         }
       } else {
+        // JSON 看起来完整但仍然解析失败
+        console.error('JSON appears complete but parsing failed');
         throw parseError;
       }
     }
