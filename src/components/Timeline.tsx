@@ -22,10 +22,16 @@ export default function TimelineComponent({ events, onEventClick }: TimelineProp
       content: `<div class="timeline-event">
         <div class="timeline-title">${event.title}</div>
         <div class="timeline-date">${event.date}</div>
+        <div class="timeline-preview">${event.description.substring(0, 60)}...</div>
+        <div class="timeline-figures">
+          ${event.relatedFigures.slice(0, 3).map(figure =>
+            `<span class="timeline-figure">${figure}</span>`
+          ).join('')}
+        </div>
       </div>`,
       start: parseDate(event.date),
       type: 'point',
-      className: 'timeline-item'
+      className: `timeline-item timeline-item-${index % 3}`
     }));
 
     const options = {

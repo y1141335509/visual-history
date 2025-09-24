@@ -47,19 +47,54 @@ export default function EventModal({ event, isOpen, onClose }: EventModalProps) 
         {/* 内容 */}
         <div className="p-6">
           <div className="prose max-w-none">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">事件概述</h3>
-            <p className="text-gray-700 leading-relaxed mb-6">
-              {event.description}
-            </p>
+            {/* 事件概述 */}
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                📋 事件概述
+              </h3>
+              <p className="text-gray-700 leading-relaxed bg-blue-50 p-4 rounded-lg border-l-4 border-blue-400">
+                {event.description}
+              </p>
+            </div>
 
-            {event.content && (
-              <>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">详细信息</h3>
-                <div className="text-gray-700 leading-relaxed">
-                  {event.content}
+            {/* 相关人物 */}
+            {event.relatedFigures && event.relatedFigures.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                  👥 相关人物
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {event.relatedFigures.map((figure, index) => (
+                    <span
+                      key={index}
+                      className="px-3 py-1 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 rounded-full text-sm font-medium border border-purple-200"
+                    >
+                      {figure}
+                    </span>
+                  ))}
                 </div>
-              </>
+              </div>
             )}
+
+            {/* 详细描述 */}
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                📖 详细描述
+              </h3>
+              <div className="text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-lg">
+                {event.content}
+              </div>
+            </div>
+
+            {/* 历史意义 */}
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                ⭐ 历史意义
+              </h3>
+              <div className="text-gray-700 leading-relaxed bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border-l-4 border-green-400">
+                {event.significance}
+              </div>
+            </div>
           </div>
         </div>
 

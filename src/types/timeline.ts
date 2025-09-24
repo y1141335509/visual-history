@@ -3,7 +3,9 @@ export interface HistoryEvent {
   date: string;
   title: string;
   description: string;
-  content?: string;
+  content: string;
+  significance: string;
+  relatedFigures: string[];
 }
 
 export interface TimelineData {
