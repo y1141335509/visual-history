@@ -70,35 +70,46 @@ export async function POST(req: NextRequest) {
       events = JSON.parse(jsonMatch[0]);
     } catch (parseError) {
       console.error('JSON parse error:', parseError);
-      console.error('Raw JSON:', jsonMatch[0]);
+      console.error('Raw JSON length:', jsonMatch[0].length);
+      console.log('Raw JSON preview:', jsonMatch[0].substring(0, 200) + '...');
 
-      // 容错处理：修复不完整的JSON
-      let jsonText = jsonMatch[0];
+      // 智能修复被截断的JSON
+      let jsonText = jsonMatch[0].trim();
 
-      // 如果 JSON 不是以 ] 结尾，说明被截断了
-      if (!jsonText.trim().endsWith(']')) {
-        // 查找最后一个完整的对象结束位置
+      // 检查是否真的是完整的JSON数组
+      const openBrackets = (jsonText.match(/\[/g) || []).length;
+      const closeBrackets = (jsonText.match(/\]/g) || []).length;
+      const openBraces = (jsonText.match(/\{/g) || []).length;
+      const closeBraces = (jsonText.match(/\}/g) || []).length;
+
+      console.log(`Brackets: ${openBrackets} open, ${closeBrackets} close`);
+      console.log(`Braces: ${openBraces} open, ${closeBraces} close`);
+
+      if (openBrackets !== closeBrackets || openBraces !== closeBraces || !jsonText.endsWith(']')) {
+        console.log('JSON is incomplete, attempting to fix...');
+
+        // 找到最后一个完整的对象
         const lastCompleteObject = jsonText.lastIndexOf('}');
 
         if (lastCompleteObject > -1) {
-          // 截取到最后一个完整对象，并添加数组结束符
+          // 确保我们在对象结束后添加数组结束符
           jsonText = jsonText.substring(0, lastCompleteObject + 1) + '\n]';
-          console.log('Attempting to fix truncated JSON:', jsonText.slice(-100));
+          console.log('Fixed JSON preview:', jsonText.slice(-150));
 
           try {
             events = JSON.parse(jsonText);
-            console.log('Successfully parsed fixed JSON, got', events.length, 'events');
+            console.log(`Successfully fixed JSON! Got ${events.length} events`);
           } catch (retryError) {
             console.error('Failed to parse fixed JSON:', retryError);
-            throw new Error('Failed to parse incomplete JSON response');
+            throw new Error('Failed to repair JSON structure');
           }
         } else {
-          console.error('JSON too incomplete - no complete objects found');
-          throw new Error('JSON response is too incomplete to parse');
+          console.error('No complete objects found in JSON');
+          throw new Error('JSON too incomplete to repair');
         }
       } else {
-        // JSON 看起来完整但仍然解析失败
-        console.error('JSON appears complete but parsing failed');
+        // JSON结构看起来完整但解析失败，可能是内容问题
+        console.error('JSON structure appears valid but parsing failed');
         throw parseError;
       }
     }
@@ -143,8 +154,29 @@ export async function POST(req: NextRequest) {
       const fallbackMatch = fallbackText.match(/\[[\s\S]*?\]/);
 
       if (fallbackMatch) {
-        const fallbackEvents = JSON.parse(fallbackMatch[0]);
-        return NextResponse.json({ events: fallbackEvents, keyword });
+        try {
+          const fallbackEvents = JSON.parse(fallbackMatch[0]);
+          console.log('Fallback JSON parsed successfully, got', fallbackEvents.length, 'events');
+          return NextResponse.json({ events: fallbackEvents, keyword });
+        } catch (fallbackParseError) {
+          console.error('Fallback JSON also failed:', fallbackParseError);
+
+          // 尝试修复兜底JSON
+          let fallbackText = fallbackMatch[0].trim();
+          const lastBrace = fallbackText.lastIndexOf('}');
+
+          if (lastBrace > -1 && !fallbackText.endsWith(']')) {
+            fallbackText = fallbackText.substring(0, lastBrace + 1) + '\n]';
+
+            try {
+              const repairedEvents = JSON.parse(fallbackText);
+              console.log('Repaired fallback JSON, got', repairedEvents.length, 'events');
+              return NextResponse.json({ events: repairedEvents, keyword });
+            } catch (repairError) {
+              console.error('Could not repair fallback JSON:', repairError);
+            }
+          }
+        }
       }
     } catch (fallbackError) {
       console.error('Fallback generation failed:', fallbackError);
