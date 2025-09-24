@@ -1,5 +1,93 @@
 @import "tailwindcss";
 
+/* Timeline 自定义样式 */
+.timeline-item {
+  border: 2px solid #3b82f6 !important;
+  background: #3b82f6 !important;
+}
+
+.timeline-item.vis-selected {
+  border: 2px solid #1d4ed8 !important;
+  background: #1d4ed8 !important;
+  box-shadow: 0 0 10px rgba(29, 78, 216, 0.5) !important;
+}
+
+.timeline-event {
+  background: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  min-width: 150px;
+  cursor: pointer;
+}
+
+.timeline-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.timeline-date {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* Vis.js Timeline 样式覆盖 */
+.vis-timeline {
+  border: 1px solid #e5e7eb !important;
+  font-family: inherit !important;
+}
+
+.vis-item {
+  border-color: #3b82f6 !important;
+}
+
+.vis-item.vis-selected {
+  border-color: #1d4ed8 !important;
+}
+
+.vis-time-axis .vis-text {
+  color: #374151 !important;
+  font-size: 12px !important;
+}
+
+.vis-time-axis .vis-text.vis-major {
+  font-weight: 600 !important;
+}
+
+/* Loading 组件样式 */
+.loading-spinner {
+  border: 3px solid #f3f4f6;
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .timeline-event {
+    min-width: 120px;
+    padding: 6px 10px;
+  }
+
+  .timeline-title {
+    font-size: 13px;
+  }
+
+  .timeline-date {
+    font-size: 11px;
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
