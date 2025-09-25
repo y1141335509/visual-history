@@ -6,6 +6,101 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+// 手动提取数据而不依赖JSON解析 - 支持多个事件
+function extractDataManually(responseText: string): HistoryEvent[] {
+  const events: HistoryEvent[] = [];
+
+  try {
+    console.log('Attempting manual data extraction for multiple events...');
+
+    // 尝试按对象分割文本
+    const objectPattern = /\{\s*"id"\s*:\s*"([^"]+)"\s*,[\s\S]*?\}/g;
+    let match;
+    let eventIndex = 1;
+
+    while ((match = objectPattern.exec(responseText)) !== null) {
+      const eventText = match[0];
+
+      // 提取各个字段
+      const id = extractFieldFromText(eventText, 'id') || eventIndex.toString();
+      const date = extractFieldFromText(eventText, 'date');
+      const title = extractFieldFromText(eventText, 'title');
+      const description = extractFieldFromText(eventText, 'description');
+      const content = extractFieldFromText(eventText, 'content') || description;
+      const significance = extractFieldFromText(eventText, 'significance') || '历史意义重大';
+      const relatedFigures = extractArrayFromText(eventText, 'relatedFigures');
+
+      if (date && title && description) {
+        events.push({
+          id,
+          date,
+          title,
+          description,
+          content,
+          significance,
+          relatedFigures
+        });
+        console.log(`Manually extracted event ${eventIndex}: ${title}`);
+        eventIndex++;
+      }
+    }
+
+    // 如果没有提取到多个事件，回退到单事件提取
+    if (events.length === 0) {
+      console.log('No multiple events found, trying single event extraction...');
+
+      if (responseText.includes('"id"') && responseText.includes('"title"')) {
+        const id = extractFieldFromText(responseText, 'id') || '1';
+        const date = extractFieldFromText(responseText, 'date');
+        const title = extractFieldFromText(responseText, 'title');
+        const description = extractFieldFromText(responseText, 'description');
+        const content = extractFieldFromText(responseText, 'content') || description;
+        const significance = extractFieldFromText(responseText, 'significance') || '历史意义重大';
+        const relatedFigures = extractArrayFromText(responseText, 'relatedFigures');
+
+        if (date && title && description) {
+          events.push({
+            id,
+            date,
+            title,
+            description,
+            content,
+            significance,
+            relatedFigures
+          });
+          console.log(`Manually extracted single event: ${title}`);
+        }
+      }
+    }
+
+    console.log(`Manual extraction completed: ${events.length} events`);
+    return events;
+  } catch (error) {
+    console.error('Manual extraction failed:', error);
+    return [];
+  }
+}
+
+// 辅助函数：从文本中提取字段
+function extractFieldFromText(text: string, fieldName: string): string {
+  const pattern = new RegExp(`"${fieldName}"\\s*:\\s*"([^"]*)"`, 'g');
+  const match = pattern.exec(text);
+  return match ? match[1] : '';
+}
+
+// 辅助函数：从文本中提取数组
+function extractArrayFromText(text: string, fieldName: string): string[] {
+  const pattern = new RegExp(`"${fieldName}"\\s*:\\s*\\[([^\\]]*)]`, 'g');
+  const match = pattern.exec(text);
+  if (match) {
+    const arrayContent = match[1];
+    return arrayContent.split(',').map(item =>
+      item.trim().replace(/"/g, '').replace(/^\s*,?\s*/, '')
+    ).filter(item => item.length > 0);
+  }
+  return [];
+}
+
 export async function POST(req: NextRequest) {
   const { keyword } = await req.json(); // 移到外层以便兜底方案使用
 
@@ -15,37 +110,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Keyword is required' }, { status: 400 });
     }
 
-    const prompt = `请为历史主题"${keyword}"生成5-7个最重要的历史事件，内容详实但简洁。
+    // 检测是否为详细询问
+    const isDetailedQuery = keyword.includes('详细讲解') || keyword.includes('详细介绍') || keyword.includes('深入分析');
+    const cleanKeyword = keyword.replace(/详细讲解|详细介绍|深入分析/g, '').trim();
 
-要求：
-1. 返回严格的JSON格式数组，确保JSON完整有效
-2. 每个事件包含：id, date, title, description, content, significance, relatedFigures
-3. date格式：具体年份（如"618年"、"1949年10月1日"）
-4. title：精准的事件名称（10-20字）
-5. description：事件概述（60-80字）
-6. content：详细描述，包括背景、过程、影响（150-200字）
-7. significance：历史意义和影响（80-120字）
-8. relatedFigures：相关重要人物（字符串数组，3-4人）
-9. 按时间顺序排列，确保历史准确性
+    const prompt = isDetailedQuery
+      ? `请详细讲解"${cleanKeyword}"，生成5-8个相关历史事件组成完整时间线：
 
-重要：请确保返回的JSON格式完整，以]结尾。
+[{"id":"1","date":"年份","title":"事件名","description":"简述","content":"详情","significance":"意义","relatedFigures":["人物"]}]
 
-示例格式：
-[
-  {
-    "id": "1",
-    "date": "618年",
-    "title": "唐朝建立",
-    "description": "李渊在长安称帝建立唐朝，结束了魏晋南北朝的分裂局面，开创统一盛世。",
-    "content": "隋朝末年政治腐败，农民起义频发。李渊为隋朝太原留守，在李世民劝说下起兵反隋。617年起兵太原，618年攻入长安正式称帝，建立唐朝。李渊建立政治制度，统一全国，为唐朝强盛打下基础。",
-    "significance": "唐朝建立标志着中国进入新的历史时期，为后续贞观之治创造条件，成为中国古代最繁荣朝代。",
-    "relatedFigures": ["李渊", "李世民", "李建成", "裴寂"]
-  }
-]`;
+要求按时间顺序排列，涵盖背景、过程、高潮、结果等完整阶段。`
+      : `为"${keyword}"生成3个重要历史事件：
+
+[{"id":"1","date":"年份","title":"事件名","description":"简述","content":"详情","significance":"意义","relatedFigures":["人物"]}]
+
+请按时间顺序排列。`;
 
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 4000, // 增加token限制以支持更详细内容
+      max_tokens: 1000, // 大幅减少token限制确保JSON完整
       messages: [{
         role: "user",
         content: prompt
@@ -53,64 +136,40 @@ export async function POST(req: NextRequest) {
     });
 
     const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+    console.log('Claude response received, length:', responseText.length);
 
-    // 提取JSON内容 - 更严格的匹配
+    // 更强大的JSON提取和修复
+    let events: HistoryEvent[] = [];
+
+    // 首先尝试找到JSON数组
     let jsonMatch = responseText.match(/\[[\s\S]*?\]/);
     if (!jsonMatch) {
-      // 尝试匹配不完整的JSON
-      jsonMatch = responseText.match(/\[[\s\S]*$/);
-      if (!jsonMatch) {
-        console.error('No JSON found in response:', responseText);
-        throw new Error('No JSON found in Claude response');
-      }
+      // 尝试找到开始的数组但可能不完整
+      jsonMatch = responseText.match(/\[[\s\S]*/);
     }
 
-    let events: HistoryEvent[];
+    if (!jsonMatch) {
+      console.error('No JSON array found in response');
+      throw new Error('No JSON found in Claude response');
+    }
+
+    let jsonText = jsonMatch[0].trim();
+    console.log('Extracted JSON length:', jsonText.length);
+
+    // 打印完整的 JSON 进行调试
+    console.log('Full extracted JSON:', jsonText);
+
+    // 尝试直接解析
     try {
-      events = JSON.parse(jsonMatch[0]);
+      events = JSON.parse(jsonText);
+      console.log(`Direct JSON parse successful! Got ${events.length} events`);
     } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      console.error('Raw JSON length:', jsonMatch[0].length);
-      console.log('Raw JSON preview:', jsonMatch[0].substring(0, 200) + '...');
+      console.log('Direct parse failed, attempting manual extraction...');
 
-      // 智能修复被截断的JSON
-      let jsonText = jsonMatch[0].trim();
-
-      // 检查是否真的是完整的JSON数组
-      const openBrackets = (jsonText.match(/\[/g) || []).length;
-      const closeBrackets = (jsonText.match(/\]/g) || []).length;
-      const openBraces = (jsonText.match(/\{/g) || []).length;
-      const closeBraces = (jsonText.match(/\}/g) || []).length;
-
-      console.log(`Brackets: ${openBrackets} open, ${closeBrackets} close`);
-      console.log(`Braces: ${openBraces} open, ${closeBraces} close`);
-
-      if (openBrackets !== closeBrackets || openBraces !== closeBraces || !jsonText.endsWith(']')) {
-        console.log('JSON is incomplete, attempting to fix...');
-
-        // 找到最后一个完整的对象
-        const lastCompleteObject = jsonText.lastIndexOf('}');
-
-        if (lastCompleteObject > -1) {
-          // 确保我们在对象结束后添加数组结束符
-          jsonText = jsonText.substring(0, lastCompleteObject + 1) + '\n]';
-          console.log('Fixed JSON preview:', jsonText.slice(-150));
-
-          try {
-            events = JSON.parse(jsonText);
-            console.log(`Successfully fixed JSON! Got ${events.length} events`);
-          } catch (retryError) {
-            console.error('Failed to parse fixed JSON:', retryError);
-            throw new Error('Failed to repair JSON structure');
-          }
-        } else {
-          console.error('No complete objects found in JSON');
-          throw new Error('JSON too incomplete to repair');
-        }
-      } else {
-        // JSON结构看起来完整但解析失败，可能是内容问题
-        console.error('JSON structure appears valid but parsing failed');
-        throw parseError;
+      // 手动提取策略
+      events = extractDataManually(responseText);
+      if (events.length === 0) {
+        throw new Error('Could not extract any valid events from response');
       }
     }
 
@@ -118,32 +177,24 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Timeline generation error:', error);
 
-    // 兜底方案：如果详细版本失败，尝试生成简化版本
+    // 简化的兜底方案
     try {
-      const fallbackPrompt = `请为历史主题"${keyword}"生成5个重要历史事件。
-
-要求：
-1. 返回严格的JSON格式数组
-2. 每个事件包含：id, date, title, description, content, significance, relatedFigures
-3. 内容简洁但准确
-4. 确保JSON格式完整
-
-示例格式：
+      const fallbackPrompt = `为"${keyword}"生成3个历史事件的JSON数组：
 [
   {
     "id": "1",
-    "date": "618年",
-    "title": "唐朝建立",
-    "description": "李渊建立唐朝，开创盛世",
-    "content": "李渊在长安建立唐朝，结束分裂局面",
-    "significance": "开创中国古代盛世王朝",
-    "relatedFigures": ["李渊", "李世民"]
+    "date": "年份",
+    "title": "事件名",
+    "description": "简述",
+    "content": "详情",
+    "significance": "意义",
+    "relatedFigures": ["人物"]
   }
 ]`;
 
       const fallbackMessage = await anthropic.messages.create({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
+        max_tokens: 1500,
         messages: [{
           role: "user",
           content: fallbackPrompt
@@ -151,35 +202,30 @@ export async function POST(req: NextRequest) {
       });
 
       const fallbackText = fallbackMessage.content[0].type === 'text' ? fallbackMessage.content[0].text : '';
-      const fallbackMatch = fallbackText.match(/\[[\s\S]*?\]/);
+      console.log('Fallback response length:', fallbackText.length);
+
+      // 使用同样的修复逻辑
+      let fallbackMatch = fallbackText.match(/\[[\s\S]*?\]/);
+      if (!fallbackMatch) {
+        fallbackMatch = fallbackText.match(/\[[\s\S]*/);
+      }
 
       if (fallbackMatch) {
         try {
           const fallbackEvents = JSON.parse(fallbackMatch[0]);
-          console.log('Fallback JSON parsed successfully, got', fallbackEvents.length, 'events');
+          console.log('Fallback succeeded, got', fallbackEvents.length, 'events');
           return NextResponse.json({ events: fallbackEvents, keyword });
         } catch (fallbackParseError) {
-          console.error('Fallback JSON also failed:', fallbackParseError);
-
-          // 尝试修复兜底JSON
-          let fallbackText = fallbackMatch[0].trim();
-          const lastBrace = fallbackText.lastIndexOf('}');
-
-          if (lastBrace > -1 && !fallbackText.endsWith(']')) {
-            fallbackText = fallbackText.substring(0, lastBrace + 1) + '\n]';
-
-            try {
-              const repairedEvents = JSON.parse(fallbackText);
-              console.log('Repaired fallback JSON, got', repairedEvents.length, 'events');
-              return NextResponse.json({ events: repairedEvents, keyword });
-            } catch (repairError) {
-              console.error('Could not repair fallback JSON:', repairError);
-            }
+          // 使用手动提取函数
+          const extractedEvents = extractDataManually(fallbackText);
+          if (extractedEvents.length > 0) {
+            console.log('Fallback manual extraction succeeded, got', extractedEvents.length, 'events');
+            return NextResponse.json({ events: extractedEvents, keyword });
           }
         }
       }
     } catch (fallbackError) {
-      console.error('Fallback generation failed:', fallbackError);
+      console.error('Fallback failed:', fallbackError);
     }
 
     return NextResponse.json(

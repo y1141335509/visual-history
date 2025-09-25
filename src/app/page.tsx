@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import SearchInput from '@/components/SearchInput';
 import Timeline from '@/components/Timeline';
+import TimelineJS from '@/components/TimelineJS';
 import EventModal from '@/components/EventModal';
 import { HistoryEvent, TimelineData } from '@/types/timeline';
 
@@ -12,6 +13,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<HistoryEvent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [timelineType, setTimelineType] = useState<'vis' | 'timelinejs'>('timelinejs');
 
   const handleSearch = async (keyword: string) => {
     setLoading(true);
@@ -90,6 +92,34 @@ export default function Home() {
           <SearchInput onSearch={handleSearch} loading={loading} />
         </div>
 
+        {/* 模版选择 */}
+        {timelineData && !loading && (
+          <div className="mb-6 flex justify-center">
+            <div className="inline-flex bg-white rounded-lg p-1 shadow-sm border border-gray-200">
+              <button
+                onClick={() => setTimelineType('timelinejs')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  timelineType === 'timelinejs'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                }`}
+              >
+                📚 历史叙事模版
+              </button>
+              <button
+                onClick={() => setTimelineType('vis')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  timelineType === 'vis'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                }`}
+              >
+                📊 交互数据模版
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* 错误提示 */}
         {error && (
           <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-center">
@@ -137,10 +167,17 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <Timeline
-              events={timelineData.events}
-              onEventClick={handleEventClick}
-            />
+            {timelineType === 'timelinejs' ? (
+              <TimelineJS
+                events={timelineData.events}
+                onEventClick={handleEventClick}
+              />
+            ) : (
+              <Timeline
+                events={timelineData.events}
+                onEventClick={handleEventClick}
+              />
+            )}
           </div>
         )}
 
@@ -157,32 +194,32 @@ export default function Home() {
               <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
                 输入任何历史主题，AI 将为您生成详实的交互式时间轴，
                 <br className="hidden md:block" />
-                深入了解历史事件的来龙去脉，感受历史的魅力。
+                提供历史叙事与数据可视化两种展示模式。
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
                 <div className="bg-white/50 backdrop-blur-sm p-6 rounded-xl border border-gray-200/50">
                   <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center text-white text-xl mb-4 mx-auto">
-                    🤖
+                    📚
                   </div>
-                  <h3 className="font-semibold text-gray-900 mb-2">AI 智能生成</h3>
-                  <p className="text-sm text-gray-600">基于 Claude 4.0，生成准确详实的历史内容</p>
+                  <h3 className="font-semibold text-gray-900 mb-2">历史叙事模版</h3>
+                  <p className="text-sm text-gray-600">专为历史内容设计，精美的视觉叙述体验</p>
                 </div>
 
                 <div className="bg-white/50 backdrop-blur-sm p-6 rounded-xl border border-gray-200/50">
                   <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center text-white text-xl mb-4 mx-auto">
-                    🎯
+                    📊
                   </div>
-                  <h3 className="font-semibold text-gray-900 mb-2">深度交互</h3>
-                  <p className="text-sm text-gray-600">点击、缩放、拖拽，全方位探索历史时间轴</p>
+                  <h3 className="font-semibold text-gray-900 mb-2">交互数据模版</h3>
+                  <p className="text-sm text-gray-600">强大的交互功能，缩放拖拽探索时间轴</p>
                 </div>
 
                 <div className="bg-white/50 backdrop-blur-sm p-6 rounded-xl border border-gray-200/50">
                   <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white text-xl mb-4 mx-auto">
-                    📖
+                    🤖
                   </div>
-                  <h3 className="font-semibold text-gray-900 mb-2">内容详实</h3>
-                  <p className="text-sm text-gray-600">背景、过程、意义、人物，全方位解读</p>
+                  <h3 className="font-semibold text-gray-900 mb-2">AI 智能生成</h3>
+                  <p className="text-sm text-gray-600">基于 Claude，生成详实的历史内容和分析</p>
                 </div>
               </div>
             </div>
